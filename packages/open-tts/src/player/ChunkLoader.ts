@@ -19,6 +19,7 @@ export class ChunkLoader {
   private localCache: CachedAudio[] = [];
   private backgroundRequestProcessor: IntervalDaemon;
   private garbageCollector: IntervalDaemon;
+  private requestGate = new RequestGate();
 
   constructor({ system }: { system: AudioSystem }) {
     this.system = system;
@@ -79,10 +80,15 @@ export class ChunkLoader {
     this.backgroundRequestProcessor.startIfNot();
   }
 
+  /**
+   * @param priority lower runs first when the model limits concurrent requests,
+   * e.g. the chunk's position in the text
+   */
   async load(
     text: string,
     options: TTSModelOptions,
     context: AudioTextContext = {},
+    priority: number = 0,
   ): Promise<AudioData> {
     const existing = this.localCache.find(
       (x) => x.text === text && mobx.comparer.structural(x.options, options), // Use structural comparison
@@ -92,7 +98,7 @@ export class ChunkLoader {
       existing.requestedTime = Date.now();
       return existing.result;
     } else {
-      const audio = this.createCachedAudio(text, options, context);
+      const audio = this.createCachedAudio(text, options, context, priority);
       this.localCache.push(audio);
       return audio.result;
     }
@@ -111,15 +117,18 @@ export class ChunkLoader {
     text: string,
     options: TTSModelOptions,
     context: AudioTextContext = {},
+    priority: number = 0,
   ): CachedAudio {
     const audio: CachedAudio = {
       text,
       options,
       requestedTime: Date.now(),
-      result: this.tryLoadTrack(text, options, 0, 3, context).catch((e) => {
-        this.destroyCachedAudio(audio);
-        throw e;
-      }),
+      result: this.tryLoadTrack(text, options, 0, 3, context, priority).catch(
+        (e) => {
+          this.destroyCachedAudio(audio);
+          throw e;
+        },
+      ),
     };
     return audio;
   }
@@ -144,10 +153,12 @@ export class ChunkLoader {
     const itemOptions: TTSModelOptions = item.options;
 
     this.backgroundActiveCount += 1; // Increment active *requests* count by 1
-    this.load(item.text, itemOptions, item.context).finally(() => {
-      this.backgroundActiveCount -= 1;
-      this.processBackgroundQueue(); // Check for more work
-    });
+    this.load(item.text, itemOptions, item.context, item.position).finally(
+      () => {
+        this.backgroundActiveCount -= 1;
+        this.processBackgroundQueue(); // Check for more work
+      },
+    );
 
     return true; // Keep processor running if queue might still have items or requests are active
   }
@@ -165,9 +176,10 @@ export class ChunkLoader {
     attempt: number = 0,
     maxAttempts: number = 3,
     context: AudioTextContext = {},
+    priority: number = 0,
   ): Promise<AudioData> {
     try {
-      return await this.loadTrack(track, options, context);
+      return await this.loadTrack(track, options, context, priority);
     } catch (ex) {
       console.warn("error loading track", ex);
       const errorInfo = ex instanceof TTSErrorInfo ? ex : undefined;
@@ -185,6 +197,7 @@ export class ChunkLoader {
           attempt + 1,
           maxAttempts,
           context,
+          priority,
         );
       }
     }
@@ -195,6 +208,7 @@ export class ChunkLoader {
     text: string,
     options: TTSModelOptions,
     context: AudioTextContext = {},
+    priority: number = 0,
   ): Promise<AudioData> {
     // Check cache for mp3 (the playable format we store)
     const cached = await this.system.storage.getAudio(text, options, "mp3");
@@ -203,12 +217,21 @@ export class ChunkLoader {
     }
 
     // Call provider and convert to playable format
-    const audio = await this.system.ttsModel.call(
-      text,
-      options,
-      this.system.settings,
-      context,
+    const release = await this.requestGate.acquire(
+      this.system.ttsModel.maxConcurrentRequests ?? Infinity,
+      priority,
     );
+    let audio: AudioData;
+    try {
+      audio = await this.system.ttsModel.call(
+        text,
+        options,
+        this.system.settings,
+        context,
+      );
+    } finally {
+      release();
+    }
     const playable = await convertToPlayableFormat(audio);
 
     // Cache the mp3
@@ -219,6 +242,41 @@ export class ChunkLoader {
 }
 
 // --- Helper Interfaces and Functions ---
+
+/** Limits concurrent requests; when full, waiters with the lowest priority value go first */
+export class RequestGate {
+  private active = 0;
+  private waiting: { priority: number; resolve: () => void }[] = [];
+
+  async acquire(limit: number, priority: number): Promise<() => void> {
+    if (this.active < limit) {
+      this.active += 1;
+    } else {
+      // the releasing request hands its slot over, so `active` is unchanged
+      await new Promise<void>((resolve) =>
+        this.waiting.push({ priority, resolve }),
+      );
+    }
+    let released = false;
+    return () => {
+      if (released) return;
+      released = true;
+      this.release();
+    };
+  }
+
+  private release(): void {
+    if (this.waiting.length === 0) {
+      this.active -= 1;
+      return;
+    }
+    let next = 0;
+    for (let i = 1; i < this.waiting.length; i++) {
+      if (this.waiting[i].priority < this.waiting[next].priority) next = i;
+    }
+    this.waiting.splice(next, 1)[0].resolve();
+  }
+}
 interface IntervalDaemon {
   stop: () => IntervalDaemon;
   startIfNot: () => IntervalDaemon;

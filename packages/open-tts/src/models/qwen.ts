@@ -29,6 +29,8 @@ export const QWEN_LANGUAGES = [
 /** Self-hosted Qwen3-TTS server with an OpenAI-style /v1/audio/speech endpoint */
 export const qwenTextToSpeech: TTSModel = {
   call: qwenCallTextToSpeech,
+  // the server generates one request at a time; parallel requests only delay the next chunk
+  maxConcurrentRequests: 1,
   validateConnection: async (settings) => {
     try {
       await listQwenVoices(settings.qwen_apiBase);

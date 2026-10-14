@@ -334,5 +334,8 @@ function ProxiedTTSModel(settings: TTSPluginSettings): TTSModel {
     convertToOptions: (settings: TTSPluginSettings) => {
       return getModel().convertToOptions(settings);
     },
+    get maxConcurrentRequests() {
+      return getModel().maxConcurrentRequests;
+    },
   };
 }

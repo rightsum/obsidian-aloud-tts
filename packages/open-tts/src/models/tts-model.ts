@@ -57,6 +57,13 @@ export interface TTSModel {
    * of shared settings to apply, when this provider is selected. E.g. read openai_apiKey and openai_apiUrl,
    * and return { API_KEY: openai_apiKey, API_URL: openai_apiUrl } */
   convertToOptions(settings: TTSPluginSettings): TTSModelOptions;
+
+  /**
+   * Maximum number of requests to run at once. Unset means unlimited. Set to 1 for
+   * servers that process one request at a time, so the chunk needed next isn't
+   * delayed behind look-ahead requests.
+   */
+  readonly maxConcurrentRequests?: number;
 }
 
 /**
