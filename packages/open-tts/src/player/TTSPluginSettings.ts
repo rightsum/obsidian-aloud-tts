@@ -15,6 +15,13 @@ export type TTSPluginSettings = {
   showPlayerView: PlayerViewMode;
   showEditorActionButton: boolean;
   autoScrollPlayerView: boolean;
+  /** Highlight the word currently being spoken */
+  highlightWords: boolean;
+  /** CSS color for the spoken word. Empty uses the theme default. */
+  highlightWordColor: string;
+  /** CSS color for the sentence being spoken. Empty uses the theme default. */
+  highlightSentenceColor: string;
+  highlightWordAnimation: WordHighlightAnimation;
   version: number;
   audioFolder: string;
   audioExportDestination: AudioExportDestination;
@@ -27,7 +34,26 @@ export type TTSPluginSettings = {
   MinimaxModelConfig &
   FishModelConfig &
   InworldModelConfig &
-  PollyModelConfig);
+  PollyModelConfig &
+  KokoroModelConfig &
+  QwenModelConfig);
+
+export interface QwenModelConfig {
+  /** base url of a Qwen3-TTS server, e.g. http://localhost:8091 */
+  qwen_apiBase: string;
+  /** a built-in voice name, or a cloned voice from the server's voices folder */
+  qwen_voice: string;
+  qwen_language: string;
+  /** optional speaking style instructions for built-in voices */
+  qwen_instructions: string;
+}
+
+export interface KokoroModelConfig {
+  /** base url of a Kokoro-FastAPI server, e.g. http://localhost:8880 */
+  kokoro_apiBase: string;
+  /** the voice to use, or a blend such as "af_bella+af_sky" */
+  kokoro_voice: string;
+}
 
 export interface InworldModelConfig {
   /** the API key to use */
@@ -202,8 +228,19 @@ export const modelProviders = [
   "fish",
   "inworld",
   "polly",
+  "kokoro",
+  "qwen",
 ] as const;
 export type ModelProvider = (typeof modelProviders)[number];
+
+export const wordHighlightAnimations = [
+  "sweep",
+  "pop",
+  "glow",
+  "underline",
+  "none",
+] as const;
+export type WordHighlightAnimation = (typeof wordHighlightAnimations)[number];
 
 export const DEFAULT_SETTINGS: TTSPluginSettings = {
   modelProvider: "openai",
@@ -214,6 +251,10 @@ export const DEFAULT_SETTINGS: TTSPluginSettings = {
   showPlayerView: "always-mobile",
   showEditorActionButton: true,
   autoScrollPlayerView: true,
+  highlightWords: true,
+  highlightWordColor: "",
+  highlightSentenceColor: "",
+  highlightWordAnimation: "sweep",
   // gemini
   gemini_apiKey: "",
   gemini_ttsModel: "gemini-2.5-flash-preview-tts",
@@ -238,7 +279,7 @@ export const DEFAULT_SETTINGS: TTSPluginSettings = {
   openaicompat_generationSpeed: 1,
   // elevenlabs
   elevenlabs_apiKey: "",
-  elevenlabs_model: "eleven_multilingual_v2",
+  elevenlabs_model: "eleven_v4",
   elevenlabs_voice: "",
   elevenlabs_stability: 0.5,
   elevenlabs_similarity: 0.75,
@@ -273,6 +314,16 @@ export const DEFAULT_SETTINGS: TTSPluginSettings = {
   polly_region: "us-east-1",
   polly_voiceId: "Joanna",
   polly_engine: "neural",
+
+  // kokoro
+  kokoro_apiBase: "http://localhost:8880",
+  kokoro_voice: "af_heart",
+
+  // qwen
+  qwen_apiBase: "http://localhost:8091",
+  qwen_voice: "Vivian",
+  qwen_language: "English",
+  qwen_instructions: "",
 
   version: 2,
   audioFolder: "aloud",

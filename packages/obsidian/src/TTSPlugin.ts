@@ -1,8 +1,8 @@
 import { TTSCodeMirror } from "./TTSCodemirror";
 import { createPlayerSynchronizer } from "@open-tts/ui";
 
-import { MarkdownView, Plugin, addIcon } from "obsidian";
-import { REGISTRY } from "open-tts";
+import { MarkdownView, Plugin, addIcon, requestUrl } from "obsidian";
+import { REGISTRY, setCorsFreeFetch } from "open-tts";
 import { TTSSettingTab } from "./components/TTSPluginSettingsTab";
 import { AudioSink } from "open-tts";
 import { WebAudioSink } from "open-tts/browser";
@@ -47,6 +47,7 @@ export default class TTSPlugin extends Plugin {
   }
 
   async onload() {
+    setCorsFreeFetch(obsidianFetch);
     await this.loadSettings();
 
     // add right click menu to play selection
@@ -268,6 +269,7 @@ export default class TTSPlugin extends Plugin {
     this.audio?.destroy();
     this.bridge?.destroy();
     this.cache?.destroy();
+    setCorsFreeFetch(undefined);
   }
 
   async loadSettings() {
@@ -292,6 +294,24 @@ export default class TTSPlugin extends Plugin {
     });
     this.bridge = new ObsidianBridgeImpl(this.app, this.player, this.settings);
   }
+}
+
+/** fetch-compatible wrapper around Obsidian's requestUrl, which is not subject to CORS */
+async function obsidianFetch(
+  url: string,
+  init: RequestInit = {},
+): Promise<Response> {
+  const response = await requestUrl({
+    url,
+    method: init.method ?? "GET",
+    headers: init.headers as Record<string, string> | undefined,
+    body: init.body as string | ArrayBuffer | undefined,
+    throw: false,
+  });
+  return new Response(response.arrayBuffer, {
+    status: response.status,
+    headers: response.headers,
+  });
 }
 
 function ProxiedTTSModel(settings: TTSPluginSettings): TTSModel {
