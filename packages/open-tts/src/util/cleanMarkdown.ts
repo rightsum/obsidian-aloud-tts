@@ -23,6 +23,8 @@ export default function cleanMarkup(md: string) {
   // Remove horizontal rules
   output = output.replace(/^\s*(\*{3,}|_{3,}|-{3,})\s*$/gm, "");
 
+  output = removeReferenceNoise(output);
+
   output = output
     // Remove HTML tags
     .replace(/<[^>]*>/g, "")
@@ -86,6 +88,43 @@ export default function cleanMarkup(md: string) {
   output = processedLines.join("\n");
 
   return output;
+}
+
+const CITATION_KEY = String.raw`[A-Za-z][\w.+-]*\d{2,4}[a-z]?`;
+
+/**
+ * Removes things that are noise when spoken: footnote markers, citation keys,
+ * urls, and wiki link syntax. The words of ordinary links are kept.
+ */
+function removeReferenceNoise(md: string): string {
+  return (
+    md
+      // superscript footnote markers, e.g. ^([12](#fn-12))
+      .replace(/\^\(\s*\[\^?\d+\]\([^)]*\)\s*\)/g, "")
+      // numeric links to anchors, e.g. [12](#fn-12)
+      .replace(/\[\^?\d+\]\(#[^)]*\)/g, "")
+      // linked citation keys, e.g. [\[Ghe03\]](bibliography.md#Ghe03)
+      .replace(
+        new RegExp(String.raw`\[\\?\[${CITATION_KEY}\\?\]\]\([^)]*\)`, "g"),
+        "",
+      )
+      // escaped citation keys, e.g. \[Ghe03\]
+      .replace(new RegExp(String.raw`\\\[${CITATION_KEY}\\\]`, "g"), "")
+      // links whose text is just a url, e.g. [https://x.org](https://x.org)
+      .replace(/\[[*_]*(?:https?:\/\/|www\.)[^\]]*\]\([^)]*\)/g, "")
+      // links with no text
+      .replace(/(?<!!)\[\]\([^)]*\)/g, "")
+      // bare urls
+      .replace(
+        /(?<![(<])\b(?:https?:\/\/|www\.)[^\s<>()\]]+[^\s<>()\].,;:!?'"]/g,
+        "",
+      )
+      // wiki links: [[page|alias]] -> alias, [[folder/page#heading]] -> page heading
+      .replace(/(?<!!)\[\[([^\]|]+)\|([^\]]+)\]\]/g, "$2")
+      .replace(/(?<!!)\[\[([^\]]+)\]\]/g, (_, target: string) =>
+        (target.split("/").pop() ?? target).replace(/#\^?/g, " ").trim(),
+      )
+  );
 }
 
 /**

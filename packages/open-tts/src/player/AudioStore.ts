@@ -242,7 +242,9 @@ class AudioStoreImpl implements AudioStore {
 
   async startPlayer(opts: AudioTextOptions): Promise<ActiveAudioText> {
     await this.system.audioSink.clearMedia();
-    const audio: AudioText = buildTrack(opts, this.system.settings.chunkType);
+    const audio: AudioText = buildTrack(opts, this.system.settings.chunkType, {
+      skipReferences: this.system.settings.skipReferences,
+    });
     this.activeText?.destroy();
     mobx.runInAction(
       () => (this.activeText = new ActiveAudioTextImpl(audio, this.system)),

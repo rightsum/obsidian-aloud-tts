@@ -30,4 +30,5 @@ export * from "./util/audioProcessing";
 export { default as cleanMarkup } from "./util/cleanMarkdown";
 export * from "./util/http";
 export * from "./util/misc";
+export * from "./util/referenceSections";
 export * from "./util/wordTiming";

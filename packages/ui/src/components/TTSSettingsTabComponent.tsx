@@ -92,6 +92,7 @@ export const TTSSettingsTabComponent: React.FC<{
 
       <SettingSection title="Audio">
         <AudioOptions store={store} />
+        <SkipReferencesToggle store={store} />
       </SettingSection>
     </>
   );
@@ -120,6 +121,35 @@ const AudioOptions: React.FC<{
           <option value="sentence">Sentence</option>
           <option value="paragraph">Paragraph</option>
         </select>
+      </div>
+    </div>
+  );
+});
+
+const SkipReferencesToggle: React.FC<{
+  store: TTSPluginSettingsStore;
+}> = observer(({ store }) => {
+  return (
+    <div className="setting-item">
+      <div className="setting-item-info">
+        <div className="setting-item-name">Skip References</div>
+        <div className="setting-item-description">
+          Don't read bibliography, references, and footnote sections, or
+          bibliography entries. Links, urls, citation keys, and footnote markers
+          are always skipped.
+        </div>
+      </div>
+      <div className="setting-item-control">
+        <div
+          className={`checkbox-container${store.settings.skipReferences ? " is-enabled" : ""}`}
+          onClick={() =>
+            store.updateSettings({
+              skipReferences: !store.settings.skipReferences,
+            })
+          }
+        >
+          <input type="checkbox" tabIndex={0} />
+        </div>
       </div>
     </div>
   );

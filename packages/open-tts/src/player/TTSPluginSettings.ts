@@ -9,6 +9,8 @@ export { MARKETING_NAME, MARKETING_NAME_LONG } from "../marketing";
 export type TTSPluginSettings = {
   modelProvider: ModelProvider;
   chunkType: "sentence" | "paragraph";
+  /** Don't read bibliography/reference sections, footnote definitions, or bibliography entries */
+  skipReferences: boolean;
   playbackSpeed: number;
   cacheType: "local" | "vault";
   cacheDurationMillis: number;
@@ -245,6 +247,7 @@ export type WordHighlightAnimation = (typeof wordHighlightAnimations)[number];
 export const DEFAULT_SETTINGS: TTSPluginSettings = {
   modelProvider: "openai",
   chunkType: "sentence",
+  skipReferences: true,
   playbackSpeed: 1.0,
   cacheDurationMillis: 1000 * 60 * 60 * 24 * 7, // 7 days
   cacheType: "local",

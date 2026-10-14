@@ -1,6 +1,7 @@
 import * as mobx from "mobx";
 import { action, computed, observable } from "mobx";
 import { randomId, splitParagraphs, splitSentences } from "../util/misc";
+import { blankReferenceSections } from "../util/referenceSections";
 import { AudioSystem } from "./AudioSystem";
 import { ChunkPlayer } from "./ChunkPlayer";
 import { onMultiTextChanged } from "./onMultiTextChanged";
@@ -157,13 +158,16 @@ export class ActiveAudioTextImpl implements ActiveAudioText {
 export function buildTrack(
   opts: AudioTextOptions,
   chunkType: "sentence" | "paragraph" = "sentence",
+  { skipReferences = false }: { skipReferences?: boolean } = {},
 ): AudioText {
+  const text = skipReferences ? blankReferenceSections(opts.text) : opts.text;
   const splits =
     chunkType === "sentence"
-      ? splitSentences(opts.text, {
+      ? splitSentences(text, {
           minLength: opts.minChunkLength ?? 20,
         })
-      : splitParagraphs(opts.text, { maxChunkSize: 1000 });
+      : splitParagraphs(text, { maxChunkSize: 1000 });
+  const preview = opts.text.trim();
 
   let start = opts.start;
   const chunks = [];
@@ -189,8 +193,8 @@ export function buildTrack(
     friendlyName:
       opts.filename +
       ": " +
-      splits[0].slice(0, 20) +
-      (splits[0].length > 20 ? "..." : ""),
+      preview.slice(0, 20) +
+      (preview.length > 20 ? "..." : ""),
     created: new Date().valueOf(),
     chunks: chunks,
   });
